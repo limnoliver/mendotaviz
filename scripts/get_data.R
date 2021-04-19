@@ -1,15 +1,10 @@
-library(googlesheets)
+library(googlesheets4)
 library(ggplot2)
 library(tidyr)
 library(dplyr)
 library(cowplot)
 
-all <- gs_ls()
-sheet <- gs_title(x = "History of Ice on Lake Mendota - http://www.aos.wisc.edu/~sco/lakes/Mendota-ice.html")
-
-data <- gs_read(sheet)
-head(data)
-str(data)
+data <- read_sheet('https://docs.google.com/spreadsheets/d/1uls2NIoxZqB_r64RZSHkW5v9XUBnOglKHSiNElduZzg/edit?usp=sharing', col_types = 'nnccn')
 
 # create dates
 data$closed_date <- as.Date(paste(data$CLOSED, data$`START YEAR`), format = '%d %b %Y')
@@ -23,10 +18,10 @@ data$opened_date_stand <- data$opened_date - as.Date(paste('01 Nov', data$`END Y
 data$opened_date_stand[data$opened_date_stand < 0] <- data$opened_date_stand[data$opened_date_stand < 0] + 365
 
 # clean up data for plotting
-# including correcting for observations that have '-'
+# including correcting for observations that have NA for days
 # which was to indicate multiple freeze/thaw dates for a given year
 
-data_merge <- filter(data, !(DAYS %in% '-')) %>%
+data_merge <- filter(data, !is.na(DAYS)) %>%
   arrange(as.numeric(DAYS)) %>%
   mutate(order = 1:nrow(.)) %>%
   select('START YEAR', order)
@@ -49,56 +44,63 @@ subtitle_1 <- 'Prior to 1900, 4 months of ice cover on Lake Mendota was relative
 But the last time 4 months of ice was recorded on Lake Mendota was 1977.
 In 1982, Lake Mendota had less than 2 months of ice, an event that had never occured before and has now been recorded 5 times. (Red lines indicate years with multiple freeze/thaw dates.)'
 
-subtitle_1 <- paste0(strwrap(subtitle_1, 90), sep="", collapse="\n")
+subtitle_1 <- paste0(strwrap(subtitle_1, 150), sep="", collapse="\n")
 
 p <- ggplot(plot_dat, aes(x = year, y = days_cat)) +
   geom_point(size = 5, shape = '|', aes(color = factor(year_count))) +
   scale_color_manual(values = c('darkgray', 'red'), guide = F) +
   #scale_shape_manual(values = c('|', '!'), guide = F) +
   theme_bw() +
-  theme(panel.border = element_blank(), axis.ticks = element_blank()) +
+  theme(panel.border = element_blank(), axis.ticks = element_blank(),
+        plot.title = element_text(face = 'bold')) +
   labs(x = '', y = 'Ice duration', color = '', title = 'The shrinking ice season',
        subtitle = subtitle_1)
 
 # make long dataset, create categories for years
 plot_dat_long <- mutate(plot_dat, 
                         period = case_when(
-                          year < 1905 ~ '1855-1904',
-                          year >= 1905 & year < 1968 ~ '1905-1967',
-                          year >= 1968 ~ '1968-2017')) %>%
-  gather(key = 'metric', value = 'day', ice_on, ice_off)
+                          year < 1906 ~ '1855-1905',
+                          year >= 1906 & year < 1971 ~ '1906-1970',
+                          year >= 1971 ~ '1971-2021')) %>%
+  tidyr::pivot_longer(c(ice_on, ice_off), names_to = 'metric', values_to = 'day')
 
 # create groups for period + metric
 plot_dat_long <- mutate(plot_dat_long, 
                                 metric_group = case_when(
-                                  period == '1855-1904' & metric == 'ice_on' ~ '1855-1904 ice on',
-                                  period == '1905-1967' & metric == 'ice_on' ~ '1905-1967 ice on',
-                                  period == '1968-2017' & metric == 'ice_on' ~ '1968-2017 ice on',
-                                  period == '1855-1904' & metric == 'ice_off' ~ '1855-1904 ice off',
-                                  period == '1905-1967' & metric == 'ice_off' ~ '1905-1967 ice off',
-                                  period == '1968-2017' & metric == 'ice_off' ~ '1968-2017 ice off'
+                                  period == '1855-1905' & metric == 'ice_on' ~ '1855-1905 ice on',
+                                  period == '1906-1970' & metric == 'ice_on' ~ '1906-1970 ice on',
+                                  period == '1971-2021' & metric == 'ice_on' ~ '1971-2021 ice on',
+                                  period == '1855-1905' & metric == 'ice_off' ~ '1855-1905 ice off',
+                                  period == '1906-1970' & metric == 'ice_off' ~ '1906-1970 ice off',
+                                  period == '1971-2021' & metric == 'ice_off' ~ '1971-2021 ice off'
                                 ))
 
-subtitle_2 <- 'Both later freeze and earlier thaw dates appear to be contributing to the shorter ice season when comparing median dates of the first and last 50 years of the record. Lake Mendota froze 10 days later and thawed 11.5 days earlier.'
+# test how much later/earier ice on/ice off was over test periods
+ice_on_early <- median(filter(plot_dat_long, metric_group %in% '1855-1905 ice on') %>% pull(day))
+ice_on_late <- median(filter(plot_dat_long, metric_group %in% '1971-2021 ice on') %>% pull(day))
+ice_off_early <- median(filter(plot_dat_long, metric_group %in% '1855-1905 ice off') %>% pull(day))
+ice_off_late <- median(filter(plot_dat_long, metric_group %in% '1971-2021 ice off') %>% pull(day))
 
-subtitle_2 <- paste0(strwrap(subtitle_2, 90), sep="", collapse="\n")
+subtitle_2 <- 'Both later freeze and earlier thaw dates appear to be contributing to the shorter ice season when comparing median dates of the first and last 50 years of the record. Lake Mendota froze 10.5 days later and thawed 13.5 days earlier.'
+
+subtitle_2 <- paste0(strwrap(subtitle_2, 150), sep="", collapse="\n")
 
 # overlapping histogram plot
 p1 <- ggplot(plot_dat_long, aes(x = day)) +
   geom_density(stat = 'density', aes(fill = metric_group, color = metric_group), alpha = 0.5) +
   scale_fill_manual(values = c('blue', 'blue','gray', 'gray', 'red', 'red'), guide = F) +
   scale_color_manual(values = c('black', 'black', NA, NA, 'black', 'black'), guide = F) +
-  geom_segment(aes(x = median(plot_dat_long$day[plot_dat_long$metric_group == '1855-1904 ice on']),
-               xend = median(plot_dat_long$day[plot_dat_long$metric_group == '1855-1904 ice on']),
+  geom_segment(aes(x = median(plot_dat_long$day[plot_dat_long$metric_group == '1855-1905 ice on']),
+               xend = median(plot_dat_long$day[plot_dat_long$metric_group == '1855-1905 ice on']),
                y = -Inf, yend = 0.04), color = 'blue', linetype = 2) +
-  geom_segment(aes(x = median(plot_dat_long$day[plot_dat_long$metric_group == '1968-2017 ice on']),
-                   xend = median(plot_dat_long$day[plot_dat_long$metric_group == '1968-2017 ice on']),
+  geom_segment(aes(x = median(plot_dat_long$day[plot_dat_long$metric_group == '1971-2021 ice on']),
+                   xend = median(plot_dat_long$day[plot_dat_long$metric_group == '1971-2021 ice on']),
                    y = -Inf, yend = 0.04), color = 'red', linetype = 2) +
-  geom_segment(aes(x = median(plot_dat_long$day[plot_dat_long$metric_group == '1855-1904 ice off']),
-                   xend = median(plot_dat_long$day[plot_dat_long$metric_group == '1855-1904 ice off']),
+  geom_segment(aes(x = median(plot_dat_long$day[plot_dat_long$metric_group == '1855-1905 ice off']),
+                   xend = median(plot_dat_long$day[plot_dat_long$metric_group == '1855-1905 ice off']),
                    y = -Inf, yend = 0.04), color = 'blue', linetype = 2) +
-  geom_segment(aes(x = median(plot_dat_long$day[plot_dat_long$metric_group == '1968-2017 ice off']),
-                   xend = median(plot_dat_long$day[plot_dat_long$metric_group == '1968-2017 ice off']),
+  geom_segment(aes(x = median(plot_dat_long$day[plot_dat_long$metric_group == '1971-2021 ice off']),
+                   xend = median(plot_dat_long$day[plot_dat_long$metric_group == '1971-2021 ice off']),
                    y = -Inf, yend = 0.04), color = 'red', linetype = 2) +
   theme_classic() +
   scale_x_continuous(breaks = c(30, 61, 92, 120, 151, 181), labels = c('Dec 1', 'Jan 1', 'Feb 1', 'March 1', 'April 1', 'May 1')) +
@@ -106,7 +108,8 @@ p1 <- ggplot(plot_dat_long, aes(x = day)) +
        subtitle = subtitle_2, x = '') +
   coord_cartesian(ylim = c(0, 0.05)) +
   geom_text(aes(x = 50, y = 0.048, label = 'Freeze'), size = 4) +
-  geom_text(aes(x = 155, y = 0.048, label = 'Thaw'), size = 4) 
+  geom_text(aes(x = 155, y = 0.048, label = 'Thaw'), size = 4) +
+  theme(plot.title = element_text(face = 'bold'))
 
 # pull simplified legend from another plot
 p2 <- ggplot(plot_dat_long, aes(x = day)) +
@@ -124,7 +127,7 @@ plegend <- get_legend(p2)
 # hacky way to align plots
 p1all <- ggdraw() +
   draw_plot(p, 0, 0.5, 1, 0.5) +
-  draw_plot(p1, 0.05, 0, 0.95, 0.5) +
+  draw_plot(p1, 0.03, 0, 0.95, 0.5) +
   draw_plot(plegend, 0.57, 0.2, 0.005, 0.005)
 
-ggsave('mendota_viz.png', p1all, height = 6, width = 7)
+ggsave('mendota_viz.png', p1all, height = 7.2, width = 12.8)
