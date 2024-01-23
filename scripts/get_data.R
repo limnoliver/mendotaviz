@@ -95,14 +95,14 @@ p1 <- ggplot(plot_dat_long, aes(x = day)) +
   geom_segment(aes(x = median(plot_dat_long$day[plot_dat_long$metric_group == '1855-1905 ice on']),
                xend = median(plot_dat_long$day[plot_dat_long$metric_group == '1855-1905 ice on']),
                y = -Inf, yend = 0.04), color = 'blue', linetype = 2) +
-  geom_segment(aes(x = median(plot_dat_long$day[plot_dat_long$metric_group == '1971-2021 ice on']),
-                   xend = median(plot_dat_long$day[plot_dat_long$metric_group == '1971-2021 ice on']),
+  geom_segment(aes(x = median(plot_dat_long$day[plot_dat_long$metric_group == '1972-2022 ice on']),
+                   xend = median(plot_dat_long$day[plot_dat_long$metric_group == '1972-2022 ice on']),
                    y = -Inf, yend = 0.04), color = 'red', linetype = 2) +
   geom_segment(aes(x = median(plot_dat_long$day[plot_dat_long$metric_group == '1855-1905 ice off']),
                    xend = median(plot_dat_long$day[plot_dat_long$metric_group == '1855-1905 ice off']),
                    y = -Inf, yend = 0.04), color = 'blue', linetype = 2) +
-  geom_segment(aes(x = median(plot_dat_long$day[plot_dat_long$metric_group == '1971-2021 ice off']),
-                   xend = median(plot_dat_long$day[plot_dat_long$metric_group == '1971-2021 ice off']),
+  geom_segment(aes(x = median(plot_dat_long$day[plot_dat_long$metric_group == '1972-2022 ice off']),
+                   xend = median(plot_dat_long$day[plot_dat_long$metric_group == '1972-2022 ice off']),
                    y = -Inf, yend = 0.04), color = 'red', linetype = 2) +
   theme_classic() +
   scale_x_continuous(breaks = c(30, 61, 92, 120, 151, 181), labels = c('Dec 1', 'Jan 1', 'Feb 1', 'March 1', 'April 1', 'May 1')) +
